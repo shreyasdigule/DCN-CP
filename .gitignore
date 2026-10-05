@@ -6,3 +6,9 @@ __pycache__/
 dist/
 build/
 .env
+
+# Frontend
+node_modules/
+.vite/
+*.tsbuildinfo
+*-debug.log*
