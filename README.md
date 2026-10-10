@@ -1,99 +1,130 @@
 # Automatic IPv4 Subnet Calculator and Network Designer
 
-A college Data Communication and Networking project for planning IPv4 subnets, comparing Fixed Length Subnet Masking (FLSM) with Variable Length Subnet Masking (VLSM), and producing reviewable Cisco IOS-style configuration snippets.
+A full-stack educational network-planning project. Enter a parent IPv4 CIDR and named subnet host requirements, then calculate a Fixed Length Subnet Masking (FLSM) plan, a Variable Length Subnet Masking (VLSM) plan, or compare both using the same inputs.
 
-The project is API-first so a separately designed Figma frontend can use the same calculation and export endpoints. The interactive API documentation is also a working demonstration interface.
+The React/Vite frontend presents address plans and utilization metrics. A FastAPI service runs the IPv4 allocation engine and produces a downloadable CSV report or a review-only, Cisco IOS-inspired configuration example. The example is text output only: the application does not connect to or configure network devices.
 
-See [Project Requirements and Workflow](docs/PROJECT_REQUIREMENTS.md) for scope, functional requirements, metric definitions, research workflow, and acceptance criteria. Use [the Figma Make prompt](docs/FIGMA_PROMPT.md) to design the frontend; this repository does not implement the UI.
+See [Project Requirements and Workflow](docs/PROJECT_REQUIREMENTS.md) for scope, formulas, assumptions, research method, and acceptance criteria.
 
-## Features
+## What it does
 
-- Calculate subnet network, mask, prefix, usable host range, broadcast address, and requested-host waste.
-- Allocate equal-sized FLSM subnets or largest-first, aligned VLSM subnets within a parent CIDR.
-- Compare allocated addresses, remaining pool space, usable capacity, and host-capacity waste.
-- Export router subinterface and DHCP-pool snippets for Cisco IOS-style devices.
-- Reject invalid CIDRs, duplicate subnet names, impossible host demands, and allocations that do not fit.
+- Validates strict IPv4 parent networks, positive whole-number host requirements, unique subnet names, and optional unique VLAN IDs (1-4094).
+- Calculates aligned, non-overlapping, contained subnet allocations:
+  - **FLSM** assigns every demand a same-sized block based on the largest host requirement.
+  - **VLSM** assigns each demand its smallest fitting block, placing larger blocks first.
+- Displays subnet CIDR, mask, network address, first/last usable hosts, broadcast address, block size, usable capacity, requested hosts, and usable-host waste.
+- Reports allocated addresses, remaining unallocated parent-pool addresses, usable-host capacity, usable-host waste, allocation efficiency, and pool coverage as distinct metrics.
+- Compares FLSM and VLSM for the same design, and exports the current result as a CSV report.
+- Generates an optional IOS-inspired interface/DHCP text example. It is illustrative, requires review, and does not configure a device.
 
-## Run Locally
+## Run with Docker Compose
 
-Requires Python 3.11 or later.
+Docker Engine and the Compose plugin are required. From the repository directory:
+
+```powershell
+docker compose up --build -d
+```
+
+Open **http://localhost:8080**. The frontend and API run in one container and are served from the same origin. Swagger is available at `http://localhost:8080/docs`.
+
+To stop the services:
+
+```powershell
+docker compose down
+```
+
+The application is stateless: designs are held in the browser, and there is no user account or database.
+
+### Put it online for a small group
+
+For a small class or project group, the included [Render Blueprint](render.yaml) can deploy the app using Render's free web-service plan:
+
+1. Push this project, including `render.yaml` and `Dockerfile`, to a GitHub repository you can connect to Render.
+2. Sign in at [Render](https://dashboard.render.com/), choose **New > Blueprint**, and connect that repository.
+3. Review the `ipv4-subnet-planner` web service and select **Apply**.
+4. Wait for the first Docker build and deploy to finish. Render will show the public `*.onrender.com` URL on the service page; share that HTTPS link.
+
+This is suitable for light demonstration traffic, not a production service. Render's free web services spin down after 15 minutes without inbound traffic and can take about a minute to wake on the next visit. Free instance hours are pooled across the workspace (currently 750 hours per calendar month); check [Render's current free-service limits](https://render.com/docs/free). Designs are not stored by the app. Render controls the public host and TLS; no separate VPS or server-IP setup is needed.
+
+If using a VPS instead, clone the repository there, run `docker compose up --build -d`, open the chosen host port (8080 by default) in both the server and provider firewalls, then share `http://SERVER-IP:8080`. Use a domain and HTTPS reverse proxy for a lasting public service. Docker alone does not create an internet-reachable link.
+
+## Run without Docker
+
+Requires Python 3.11+ and Node.js 22+.
+
+Start the backend in one terminal:
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-$env:SUBNET_DESIGN_CORS_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 uvicorn subnet_design.api:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` to try the endpoints in Swagger UI. The API health endpoint is `GET /api/v1/health`.
-The API allows only the configured origins; local Vite preview origins on ports 5173 and 4173 are allowed by default. Set `SUBNET_DESIGN_CORS_ORIGINS` to a comma-separated list of exact origins for another local UI host. Do not use `*`. A hosted Figma preview still needs network access to a reachable backend; CORS cannot make a remote service reach your computer's `localhost`.
-
-Run the reproducible classroom demo in a second terminal:
+Start the frontend from the repository root in a second terminal:
 
 ```powershell
-subnet-designer-demo
+npm ci
+npm run dev
 ```
 
-Run tests:
+Open `http://127.0.0.1:5173`; the frontend uses `http://127.0.0.1:8000` for the API by default. Set `VITE_API_BASE_URL` before running Vite to use a different API origin. If the origin is not one of the API's default local origins, add that exact origin to `SUBNET_DESIGN_CORS_ORIGINS`.
+
+Run backend tests:
 
 ```powershell
 pytest
 ```
 
-## API Examples
+Run the deterministic CLI demonstration:
 
-`POST /api/v1/subnets/calculate` accepts `FLSM`, `VLSM`, or `BOTH`:
-
-```json
-{
-  "parent_cidr": "10.44.0.0/21",
-  "strategy": "BOTH",
-  "demands": [
-    {"name": "Engineering", "hosts": 500, "vlan_id": 10},
-    {"name": "Computer Lab", "hosts": 120, "vlan_id": 20},
-    {"name": "Administration", "hosts": 50, "vlan_id": 30},
-    {"name": "Point-to-point", "hosts": 2, "vlan_id": 40}
-  ]
-}
+```powershell
+subnet-designer-demo
 ```
 
-`POST /api/v1/config/cisco-ios` accepts the same parent and demands, with `FLSM` or `VLSM`, and returns a configuration string. The generated text is an educational starting point. Validate interface names, gateway policy, DHCP behavior, and platform syntax before any device use.
+## Example workload and metric definitions
 
-## Research Objective and Method
+The included, illustrative workload uses `10.44.0.0/21` (2,048 addresses):
 
-**Objective:** compare address utilization for FLSM and VLSM when both strategies must satisfy the same department host demands inside the same IPv4 parent network.
+| Subnet | Requested hosts | VLAN |
+| --- | ---: | ---: |
+| Engineering | 500 | 10 |
+| Computer Lab | 120 | 20 |
+| Administration | 50 | 30 |
+| Point-to-point | 2 | 40 |
 
-The included illustrative workload is Engineering (500 hosts), Computer Lab (120), Administration (50), and a point-to-point segment (2), allocated from `10.44.0.0/21` (2,048 total addresses). Replace these assumptions with an explicitly sourced or documented campus scenario for a final report.
+These values are a repeatable project example, not measured campus data. With conventional network and broadcast reservations, the sample FLSM allocation reserves 2,048 addresses across four `/23`s. VLSM reserves 708 addresses using `/23`, `/25`, `/26`, and `/30`, leaving 1,340 addresses unallocated in the parent pool. These results describe this workload only.
 
-The allocator reserves network and broadcast addresses for each subnet, including `/30` for a two-host point-to-point requirement. FLSM sizes every subnet for the largest demand. VLSM rounds each demand up to its smallest fitting block and allocates the largest block first, aligning every network boundary.
+- **Allocated addresses:** sum of assigned subnet block sizes.
+- **Unallocated pool:** parent-pool addresses not assigned to subnets; they remain free pool space.
+- **Usable-host capacity:** allocated addresses less each subnet's network and broadcast addresses.
+- **Usable-host waste:** usable-host capacity less requested hosts; it does not include unallocated pool space.
+- **Allocation efficiency:** requested hosts divided by usable-host capacity.
+- **Pool coverage:** allocated addresses divided by total parent-pool addresses.
 
-Metrics are reported separately:
+IPv4 `/31` point-to-point semantics are not modeled; the minimum allocation is `/30`.
 
-- **Allocated addresses:** the sum of complete subnet blocks reserved by a strategy.
-- **Unallocated pool addresses:** parent-pool addresses not assigned to any subnet.
-- **Usable host capacity:** allocated addresses less each subnet's network and broadcast addresses.
-- **Usable-host waste:** usable capacity less requested hosts.
-- **Allocation efficiency:** requested hosts divided by assigned usable capacity.
+## API
 
-For the included workload, FLSM uses four `/23` networks (2,048 addresses, 2,040 usable hosts, 1,368 usable-host addresses above demand). VLSM uses `/23`, `/25`, `/26`, and `/30` blocks (708 addresses, 700 usable hosts, 28 above demand). This example therefore saves 1,340 allocated addresses and reduces usable-host waste by 1,340 addresses, about 97.95%. These figures are deterministic results for the sample only, not a universal claim that VLSM always improves utilization by that amount.
+- `GET /api/v1/health` — service health.
+- `POST /api/v1/subnets/calculate` — calculate `FLSM`, `VLSM`, or `BOTH`.
+- `POST /api/v1/config/cisco-ios` — return a review-only IOS-inspired text example for `FLSM` or `VLSM`.
 
-### Suggested Experiment
+The interactive API reference is at `/docs` when the service is running.
 
-1. Keep the parent CIDR fixed and compare FLSM with VLSM for the same demand list.
-2. Repeat with uniform, moderately uneven, and highly uneven host-demand distributions.
-3. Record allocated addresses, unallocated addresses, usable-host waste, and efficiency for every scenario.
-4. Explain that block-size rounding and required network/broadcast addresses constrain both strategies; report input assumptions with every result.
-
-## Project Structure
+## Repository layout
 
 ```text
-src/subnet_design/   IPv4 engine, API, config generator, demo
-tests/               allocation and config tests
-docs/FIGMA_PROMPT.md Figma Make frontend brief
-docs/PROJECT_REQUIREMENTS.md requirements, workflow, and research method
+src/subnet_design/   IPv4 engine, API, configuration example, CLI demo
+src/frontend/        React planning interface and styles
+tests/               API and allocation tests
+deploy/              Container entrypoint and reverse-proxy configuration
+Dockerfile           Combined frontend/API image for Compose and Render
+docker-compose.yml   Local container orchestration
+render.yaml          One-click Render Blueprint deployment
+docs/                Requirements, research workflow, and design brief
 ```
 
-## Safety and Scope
+## Safety and limitations
 
-This project does not configure devices, discover live networks, or replace a network engineer's review. Configuration output is illustrative and has no vendor-device integration. Address planning assumes conventional IPv4 subnets with network and broadcast addresses reserved; IPv4 `/31` point-to-point behavior is intentionally not modeled.
+This project plans conventional IPv4 subnets and creates reviewable example text. It does not discover networks, connect to routers, apply configuration, persist designs, or replace an engineer's review. Check interface names, gateways, DHCP behavior, and platform syntax before adapting any generated example.

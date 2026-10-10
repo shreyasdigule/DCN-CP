@@ -4,11 +4,11 @@
 
 **Project:** Automatic IPv4 Subnet Calculator and Network Designer  
 **Course area:** Data Communication and Networking  
-**Project type:** IPv4 planning engine, utilization comparison, and configuration-example generator, with a separately designed frontend in Figma.
+**Project type:** IPv4 planning engine, utilization comparison, configuration-example generator, and React frontend based on the Figma design.
 
 The tool accepts a parent IPv4 network and a list of named subnet host requirements. It calculates allocations using Fixed Length Subnet Masking (FLSM), Variable Length Subnet Masking (VLSM), or both; reports address-utilization metrics; and generates a reviewable Cisco IOS-style configuration example.
 
-The implementation is API-first. The current deliverable includes a Python/FastAPI backend and an interactive Swagger demonstration. The frontend is a Figma design/prototype deliverable and is not implemented in this repository.
+The implementation is API-first, with a Python/FastAPI backend, a React/Vite frontend that uses its calculation and configuration-export endpoints, and an interactive Swagger demonstration.
 
 ## 2. Objectives
 
@@ -28,6 +28,7 @@ The implementation is API-first. The current deliverable includes a Python/FastA
 - Subnet details: network CIDR, prefix length, mask, first/last usable host, broadcast address, total block size, and usable-host waste.
 - Per-strategy and comparative utilization summaries.
 - Cisco IOS-style router-subinterface and DHCP-pool text export.
+- Downloadable CSV design report containing allocation metrics, comparison values when available, subnet details, and metric definitions.
 - HTTP validation errors for invalid input or allocations that cannot fit.
 - A deterministic example workload and repeatable research procedure.
 
@@ -77,8 +78,10 @@ For every subnet, show its name, optional VLAN, CIDR, prefix length, subnet mask
 For one selected strategy, generate Cisco IOS-style subinterface and DHCP-pool text using the allocated network and first usable address as the example gateway. The output includes a prominent review warning. Export must not be described as applying configuration to a device.
 
 ### FR-8: Support the project demonstration
-
 The backend provides a health endpoint, documented interactive API endpoints, a deterministic CLI demonstration, and automated tests.
+
+### FR-9: Export the subnet plan
+After a successful calculation, the user can download a CSV report containing the parent network, available per-strategy metrics and subnet details, comparison values when comparing strategies, and definitions that distinguish allocated, unallocated, usable-capacity, and waste values.
 
 ## 6. Metrics and Research Definitions
 
@@ -105,7 +108,7 @@ Use these definitions consistently in the interface, experiment spreadsheet, pre
 4. Inspect per-subnet CIDRs and address ranges. Confirm every subnet fits within the parent, no blocks overlap, and returned host capacity meets its demand.
 5. Compare allocated addresses, unallocated parent space, usable capacity, and waste as separate values.
 6. Request the Cisco IOS-style export for the selected strategy, inspect the review warning, and explain that the sample requires platform and policy review.
-7. In the Figma prototype, repeat the same workflow with the sample fixture if the prototype cannot reach the local API. Mark fixture data as sample data.
+7. Repeat the same workflow in the React frontend and confirm the displayed values come from the running API.
 
 ### Research workflow
 
@@ -125,7 +128,7 @@ Use these definitions consistently in the interface, experiment spreadsheet, pre
 
 Use `10.44.0.0/21` for these example scenarios. These are designed test inputs, not measurements from a real campus. The supplied project sample is the highly uneven scenario.
 
-## 8. API Contract for the Figma Prototype
+## 8. API Contract for the Frontend
 
 Base URL for local development: `http://127.0.0.1:8000`.
 
@@ -139,6 +142,8 @@ The backend uses FastAPI and Pydantic for HTTP validation and response schemas, 
 For a single strategy, the calculation response has `strategy`, `subnets`, and `summary`. A `BOTH` response has `parent_network`, `demand_count`, `flsm`, `vlsm`, and `comparison`. Each strategy's `summary` contains parent pool size, allocated and unallocated addresses, requested hosts, usable capacity, waste, efficiency, and pool coverage. Each subnet row contains the details listed in FR-6.
 
 The API allows explicit browser origins. By default, the local Vite origins `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:4173`, and `http://127.0.0.1:4173` are allowed. Configure any additional exact origin with the comma-separated `SUBNET_DESIGN_CORS_ORIGINS` environment variable before starting the backend. Wildcard origins are rejected, and credentials are disabled. Keep this allowlist narrow.
+
+The Docker Compose deployment serves the frontend and proxies API routes through the same web origin, so browser CORS configuration is not required for that deployment. The API container is not published directly to the host.
 
 CORS permits a browser origin to read API responses; it does not provide routing or a tunnel from Figma's hosted preview to a developer's computer. For a local UI, allow its exact local origin. For Figma-hosted or deployed UI, use a backend reachable by that browser and allow the UI's exact origin, or keep a clearly labeled fixture matching the API response shape. Never represent fixture data as live API data.
 
@@ -160,6 +165,7 @@ CORS permits a browser origin to read API responses; it does not provide routing
 - Comparison metrics distinguish allocated addresses, usable-host capacity/waste, and unallocated parent space.
 - The sample `10.44.0.0/21` workload reports 2,048 FLSM allocated addresses, 708 VLSM allocated addresses, and 1,340 fewer VLSM allocated addresses.
 - Configuration export contains the review warning and uses allocation details; no route configures a real device.
+- The downloadable plan report uses calculated results and clearly distinguishes unallocated pool addresses from usable-host capacity and waste.
 - Tests and the documented local API demo run successfully.
 - The Figma prototype matches the API contract or clearly labels its fixture data and connectivity limitation.
 
@@ -169,4 +175,4 @@ CORS permits a browser origin to read API responses; it does not provide routing
 - Automated tests for subnet correctness, utilization comparison, validation, and configuration output.
 - This requirements/workflow document and the [Figma Make prompt](FIGMA_PROMPT.md).
 - A short report with objective, method, assumptions, per-scenario results, discussion, limitations, and conclusion.
-- A live demonstration using Swagger or the Figma prototype connected to the documented API contract.
+- A live demonstration using Swagger or the React frontend connected to the documented API contract.
