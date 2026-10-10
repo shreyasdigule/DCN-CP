@@ -249,6 +249,15 @@ tbody tr:hover { background: #e9f3f8; }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 1px 1px rgba(0, 0, 0, .2);
 }
 
+.button--calculate {
+  border-color: #17572d;
+  background: linear-gradient(#53a967, #24763b 72%, #195d2d);
+}
+
+.button--calculate:hover {
+  background: linear-gradient(#64b777, #2d8748 72%, #206b36);
+}
+
 .button--primary:active, .button--secondary:active {
   transform: translateY(1px);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, .2);

@@ -723,7 +723,7 @@ function SubnetPlanner() {
           </div>
           <div className="action-row">
             <button className="button button--secondary" type="button" onClick={addDemand} disabled={demands.length >= 256}>Add subnet</button>
-            <button className="button button--primary" type="button" onClick={calculate} disabled={status === "calculating"}>{status === "calculating" ? "Calculating..." : "Calculate"}</button>
+            <button className="button button--primary button--calculate" type="button" onClick={calculate} disabled={status === "calculating"}>{status === "calculating" ? "Calculating..." : "Calculate"}</button>
           </div>
           {error && <div className="error-message" role="alert">{error}</div>}
         </section>
