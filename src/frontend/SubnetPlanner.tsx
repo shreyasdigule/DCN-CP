@@ -67,7 +67,7 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(
     /\/$/,
     "",
-  ) ?? "http://127.0.0.1:8000"
+  ) ?? (import.meta.env.PROD ? "" : "http://127.0.0.1:8000")
 
 const initialDemands: Demand[] = [
   { id: 1, name: "Engineering", hosts: 500, vlan: 10 },
